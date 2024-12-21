@@ -1,111 +1,84 @@
-const SUSPICIOUS_UA_PATTERNS = [
-  /bot/i,
-  /crawler/i,
-  /spider/i,
-  /microsoft/i,
-  /outlook/i,
-  /slurp/i,
-  /google/i,
-  /headless/i,
-  /selenium/i,
-  /chrome-lighthouse/i
+const { getClientIp } = require('../utils/ipUtils');
+
+const SUSPICIOUS_PATTERNS = [
+  /bot/i, /crawler/i, /spider/i, /lighthouse/i,
+  /headless/i, /preview/i, /postman/i, /http/i,
+  /python/i, /curl/i, /wget/i, /node/i, /axios/i,
+  /puppeteer/i, /playwright/i, /selenium/i
 ];
 
 const REQUIRED_HEADERS = [
+  'user-agent',
   'accept',
   'accept-language',
-  'user-agent',
-  'accept-encoding'
+  'accept-encoding',
+  'connection'
 ];
 
-// Store IP request counts with timestamps
-const ipRequestLog = new Map();
+// Store request logs with automatic cleanup
+const requestLogs = new Map();
+const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+setInterval(() => {
+  const cutoff = Date.now() - CLEANUP_INTERVAL;
+  for (const [key, data] of requestLogs.entries()) {
+    if (data.lastRequest < cutoff) {
+      requestLogs.delete(key);
+    }
+  }
+}, CLEANUP_INTERVAL);
 
 function botDetectionMiddleware(req, res, next) {
-  try {
-    const score = calculateTrustScore(req);
-    
-    if (score < 70) {
-      return res.status(403).json({ 
-        error: 'Access denied',
-        message: 'Request appears to be automated'
-      });
-    }
+  const clientIp = getClientIp(req);
+  const score = calculateTrustScore(req, clientIp);
 
-    req.trustScore = score;
-    next();
-  } catch (error) {
-    next(error);
+  if (score < 70) {
+    return res.status(403).json({
+      error: 'Access denied',
+      message: 'Request appears to be automated'
+    });
   }
+
+  req.trustScore = score;
+  next();
 }
 
-function calculateTrustScore(req) {
+function calculateTrustScore(req, clientIp) {
   let score = 100;
-  
-  // 1. Check User Agent
   const ua = req.headers['user-agent'] || '';
-  if (!ua) {
-    score -= 50;
-  } else if (SUSPICIOUS_UA_PATTERNS.some(pattern => pattern.test(ua))) {
-    score -= 30;
+
+  // Check user agent
+  if (!ua || SUSPICIOUS_PATTERNS.some(pattern => pattern.test(ua))) {
+    score -= 40;
   }
-  
-  // 2. Check Required Headers
-  const missingHeaders = REQUIRED_HEADERS.filter(header => !req.headers[header]);
+
+  // Check required headers
+  const missingHeaders = REQUIRED_HEADERS.filter(h => !req.headers[h]);
   score -= (missingHeaders.length * 10);
-  
-  // 3. Check Request Rate
-  const ip = req.ip;
-  const now = Date.now();
-  const recentRequests = getRecentRequests(ip, now);
-  if (recentRequests > 10) {
-    score -= 20;
-  }
-  
-  // 4. Check Headers Consistency
-  if (!checkHeadersConsistency(req.headers)) {
-    score -= 20;
+
+  // Check request rate
+  const requestData = getRequestData(clientIp);
+  if (requestData.count > 10) {
+    score -= 30;
   }
 
   return Math.max(0, score);
 }
 
-function getRecentRequests(ip, now) {
-  cleanupOldEntries();
+function getRequestData(clientIp) {
+  const now = Date.now();
+  const data = requestLogs.get(clientIp) || { count: 0, lastRequest: 0 };
   
-  if (!ipRequestLog.has(ip)) {
-    ipRequestLog.set(ip, []);
+  if (now - data.lastRequest > 60000) {
+    data.count = 1;
+  } else {
+    data.count++;
   }
   
-  const requests = ipRequestLog.get(ip);
-  requests.push(now);
-  ipRequestLog.set(ip, requests);
+  data.lastRequest = now;
+  requestLogs.set(clientIp, data);
   
-  return requests.length;
-}
-
-function cleanupOldEntries() {
-  const oneMinuteAgo = Date.now() - 60000;
-  
-  for (const [ip, timestamps] of ipRequestLog.entries()) {
-    const recentTimestamps = timestamps.filter(time => time > oneMinuteAgo);
-    if (recentTimestamps.length === 0) {
-      ipRequestLog.delete(ip);
-    } else {
-      ipRequestLog.set(ip, recentTimestamps);
-    }
-  }
-}
-
-function checkHeadersConsistency(headers) {
-  const ua = headers['user-agent'] || '';
-  const acceptHeader = headers['accept'] || '';
-  
-  // Check if mobile UA matches mobile headers
-  const isMobileUA = /mobile/i.test(ua);
-  const isMobileAccept = /mobile/i.test(acceptHeader);
-  
-  return isMobileUA === isMobileAccept;
+  return data;
 }
 
 module.exports = { botDetectionMiddleware };
