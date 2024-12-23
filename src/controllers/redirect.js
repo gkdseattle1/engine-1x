@@ -1,8 +1,9 @@
 const crypto = require('crypto');
 const { getClientIp } = require('../utils/ipUtils');
+const { isValidUrl } = require('../utils/urlUtils');
 
 const tokenStore = new Map();
-const TOKEN_CLEANUP_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const TOKEN_CLEANUP_INTERVAL = 1 * 60 * 1000; // Run every 1 minute instead of 15
 
 // Cleanup expired tokens
 setInterval(() => {
@@ -26,11 +27,15 @@ function generateTokenController(req, res) {
 }
 
 function generateToken(destination, expiresIn = 3600000) {
+  // Add maximum expiration time of 24 hours
+  const maxExpiresIn = 24 * 60 * 60 * 1000;
+  const actualExpiresIn = Math.min(expiresIn, maxExpiresIn);
+  
   const token = crypto.randomBytes(16).toString('hex');
   
   tokenStore.set(token, {
     destination,
-    expires: Date.now() + expiresIn,
+    expires: Date.now() + actualExpiresIn,
     used: false,
     created: Date.now(),
     attempts: 0,
@@ -46,6 +51,7 @@ function redirectController(req, res) {
   const tokenData = tokenStore.get(token);
 
   if (!tokenData || tokenData.expires < Date.now()) {
+    tokenStore.delete(token);
     return res.status(404).json({ error: 'Invalid or expired token' });
   }
 
@@ -60,6 +66,7 @@ function redirectController(req, res) {
   }
 
   if (tokenData.used) {
+    tokenStore.delete(token);
     return res.status(400).json({ error: 'Token already used' });
   }
 
@@ -68,6 +75,7 @@ function redirectController(req, res) {
   const delay = calculateDelay(req.trustScore);
   
   setTimeout(() => {
+    tokenStore.delete(token);
     res.redirect(tokenData.destination);
   }, delay);
 }
@@ -78,16 +86,8 @@ function calculateDelay(trustScore) {
   return baseDelay + variableDelay;
 }
 
-function isValidUrl(string) {
-  try {
-    new URL(string);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
 module.exports = {
   generateTokenController,
-  redirectController
+  redirectController,
+  generateToken
 };
