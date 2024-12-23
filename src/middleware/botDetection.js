@@ -1,4 +1,6 @@
 const { getClientIp } = require('../utils/ipUtils');
+const { logRequest } = require('../utils/logger');
+const { getBrowserInfo } = require('../utils/browserUtils');
 
 const SUSPICIOUS_PATTERNS = [
   /bot/i, /crawler/i, /spider/i, /lighthouse/i,
@@ -31,6 +33,21 @@ setInterval(() => {
 function botDetectionMiddleware(req, res, next) {
   const clientIp = getClientIp(req);
   const score = calculateTrustScore(req, clientIp);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  
+  const requestLog = {
+    ip: clientIp,
+    userAgent,
+    browser: getBrowserInfo(userAgent),
+    trustScore: score,
+    isBot: score < 70,
+    timestamp: new Date().toISOString(),
+    path: req.path,
+    method: req.method,
+    status: score < 70 ? 'blocked' : 'passed'
+  };
+
+  logRequest(requestLog);
 
   if (score < 70) {
     return res.status(403).json({

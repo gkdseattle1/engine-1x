@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const { getClientIp } = require('../utils/ipUtils');
 const { isValidUrl } = require('../utils/urlUtils');
+const { logRequest } = require('../utils/logger');
+const { getBrowserInfo } = require('../utils/browserUtils');
 
 const tokenStore = new Map();
 const TOKEN_CLEANUP_INTERVAL = 1 * 60 * 1000; // Run every 1 minute instead of 15
@@ -49,12 +51,43 @@ function redirectController(req, res) {
   const { token } = req.params;
   const clientIp = getClientIp(req);
   const tokenData = tokenStore.get(token);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+
+  const logData = {
+    ip: clientIp,
+    userAgent,
+    browser: getBrowserInfo(userAgent),
+    trustScore: req.trustScore,
+    isBot: req.trustScore < 70,
+    path: req.path,
+    method: req.method,
+    token: token
+  };
 
   if (!tokenData || tokenData.expires < Date.now()) {
+    logData.status = 'expired';
+    logRequest(logData);
     tokenStore.delete(token);
     return res.status(404).json({ error: 'Invalid or expired token' });
   }
 
+  if (tokenData.attempts > 3 || tokenData.ips.size > 2) {
+    logData.status = 'suspicious';
+    logRequest(logData);
+    tokenStore.delete(token);
+    return res.status(403).json({ error: 'Suspicious activity detected' });
+  }
+
+  if (tokenData.used) {
+    logData.status = 'already_used';
+    logRequest(logData);
+    tokenStore.delete(token);
+    return res.status(400).json({ error: 'Token already used' });
+  }
+
+  logData.status = 'success';
+  logRequest(logData);
+  
   // Track attempts and IPs
   tokenData.attempts++;
   tokenData.ips.add(clientIp);
