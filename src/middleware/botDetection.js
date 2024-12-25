@@ -1,6 +1,7 @@
 const { getClientIp } = require('../utils/ipUtils');
 const { logRequest } = require('../utils/logger');
 const { getBrowserInfo } = require('../utils/browserUtils');
+const { checkIpAddress } = require('../../scripts/badip');
 
 const SUSPICIOUS_PATTERNS = [
   /bot/i, /crawler/i, /spider/i, /lighthouse/i,
@@ -30,37 +31,39 @@ setInterval(() => {
   }
 }, CLEANUP_INTERVAL);
 
-function botDetectionMiddleware(req, res, next) {
-  const clientIp = getClientIp(req);
-  const score = calculateTrustScore(req, clientIp);
-  const userAgent = req.headers['user-agent'] || 'Unknown';
+async function botDetectionMiddleware(req, res, next) {
+    const clientIp = getClientIp(req);
+    const ipReport = await checkIpAddress(clientIp);
+    const score = await calculateTrustScore(req, clientIp);
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    
+    const requestLog = {
+      ip: clientIp,
+      userAgent,
+      browser: getBrowserInfo(userAgent),
+      trustScore: score,
+      isBot: score < 70,
+      timestamp: new Date().toISOString(),
+      path: req.path,
+      method: req.method,
+      status: score < 70 ? 'blocked' : 'passed',
+      abuseIpReport: ipReport // Include the AbuseIPDB report
+    };
   
-  const requestLog = {
-    ip: clientIp,
-    userAgent,
-    browser: getBrowserInfo(userAgent),
-    trustScore: score,
-    isBot: score < 70,
-    timestamp: new Date().toISOString(),
-    path: req.path,
-    method: req.method,
-    status: score < 70 ? 'blocked' : 'passed'
-  };
-
-  logRequest(requestLog);
-
-  if (score < 70) {
-    return res.status(403).json({
-      error: 'Access denied',
-      message: 'Request appears to be automated'
-    });
+    logRequest(requestLog);
+  
+    if (score < 70) {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Request appears to be automated'
+      });
+    }
+  
+    req.trustScore = score;
+    next();
   }
 
-  req.trustScore = score;
-  next();
-}
-
-function calculateTrustScore(req, clientIp) {
+async function calculateTrustScore(req, clientIp) {
   let score = 100;
   const ua = req.headers['user-agent'] || '';
 
@@ -77,6 +80,12 @@ function calculateTrustScore(req, clientIp) {
   const requestData = getRequestData(clientIp);
   if (requestData.count > 10) {
     score -= 30;
+  }
+
+  // Check IP address with AbuseIPDB
+  const ipReport = await checkIpAddress(clientIp);
+  if (ipReport && ipReport.data && ipReport.data.reports && ipReport.data.reports.length > 0) {
+    score = 0; // Flag as suspicious
   }
 
   return Math.max(0, score);

@@ -18,7 +18,8 @@ function logRequest(requestData) {
     const logs = JSON.parse(fs.readFileSync(logFilePath, 'utf8'));
     logs.push({
       ...requestData,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      abuseIpReport: requestData.abuseIpReport || null
     });
     fs.writeFileSync(logFilePath, JSON.stringify(logs, null, 2));
   } catch (error) {
