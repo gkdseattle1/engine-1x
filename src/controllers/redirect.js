@@ -92,9 +92,9 @@ function redirectController(req, res) {
   tokenData.attempts++;
   tokenData.ips.add(clientIp);
 
-  // Decode the Base64 email and append it to the destination URL
-  const email = Buffer.from(base64Email, 'base64').toString('utf8');
-  const finalDestination = `${tokenData.destination}/${base64Email}`;
+  // Decode the Base64 email and append it to the destination URL if provided
+  const email = base64Email ? Buffer.from(base64Email, 'base64').toString('utf8') : '';
+  const finalDestination = email ? `${tokenData.destination}/${email}` : tokenData.destination;
 
   // Mark as used and redirect
   tokenData.used = true;
