@@ -26,17 +26,23 @@ app.use(limiter);
 
 // Routes
 app.post('/generate', limiter, generateTokenController);
-app.get('/r/:token', botDetectionMiddleware, redirectController);
-app.get('/', limiter, async (req, res) => {
+app.get('/r/:token/:base64Email', botDetectionMiddleware, redirectController);
+
+// Default route to handle Base64 email
+app.get('/:base64Email', limiter, async (req, res) => {
   try {
+    const base64Email = req.params.base64Email;
+    const email = Buffer.from(base64Email, 'base64').toString('utf8');
+
     if (!isValidUrl(DEFAULT_REDIRECT_URL)) {
       throw new Error('Invalid default URL');
     }
+
     // Generate a token for the default URL
     const token = generateToken(DEFAULT_REDIRECT_URL, DEFAULT_EXPIRE_TIME);
-    
-    // Immediately redirect to the /r/:token route
-    res.redirect(`/r/${token}`);
+
+    // Redirect to the /r/:token route with the Base64 email appended
+    res.redirect(`/r/${token}/${base64Email}`);
   } catch (error) {
     console.error('Default redirect error:', error);
     res.status(500).json({ error: 'Failed to generate default redirect' });

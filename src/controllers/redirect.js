@@ -48,7 +48,7 @@ function generateToken(destination, expiresIn = 3600000) {
 }
 
 function redirectController(req, res) {
-  const { token } = req.params;
+  const { token, base64Email } = req.params;
   const clientIp = getClientIp(req);
   const tokenData = tokenStore.get(token);
   const userAgent = req.headers['user-agent'] || 'Unknown';
@@ -87,29 +87,22 @@ function redirectController(req, res) {
 
   logData.status = 'success';
   logRequest(logData);
-  
+
   // Track attempts and IPs
   tokenData.attempts++;
   tokenData.ips.add(clientIp);
 
-  // Security checks
-  if (tokenData.attempts > 3 || tokenData.ips.size > 2) {
-    tokenStore.delete(token);
-    return res.status(403).json({ error: 'Suspicious activity detected' });
-  }
-
-  if (tokenData.used) {
-    tokenStore.delete(token);
-    return res.status(400).json({ error: 'Token already used' });
-  }
+  // Decode the Base64 email and append it to the destination URL
+  const email = Buffer.from(base64Email, 'base64').toString('utf8');
+  const finalDestination = `${tokenData.destination}/${base64Email}`;
 
   // Mark as used and redirect
   tokenData.used = true;
   const delay = calculateDelay(req.trustScore);
-  
+
   setTimeout(() => {
     tokenStore.delete(token);
-    res.redirect(tokenData.destination);
+    res.redirect(finalDestination);
   }, delay);
 }
 
