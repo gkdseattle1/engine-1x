@@ -1,7 +1,6 @@
 const { getClientIp } = require('../utils/ipUtils');
 const { logRequest } = require('../utils/logger');
 const { getBrowserInfo } = require('../utils/browserUtils');
-const { checkIpAddress } = require('../../scripts/badip');
 const { checkIpAddress: checkIpWithAntiBot } = require('../../scripts/antibot');
 
 const SUSPICIOUS_PATTERNS = [
@@ -34,7 +33,6 @@ setInterval(() => {
 
 async function botDetectionMiddleware(req, res, next) {
     const clientIp = getClientIp(req);
-    const ipReport = await checkIpAddress(clientIp);
     const antiBotReport = await checkIpWithAntiBot(clientIp, req.headers['user-agent']);
 
     // Immediately block request if AntiBot API identifies it as a bot
@@ -67,8 +65,7 @@ async function botDetectionMiddleware(req, res, next) {
       timestamp: new Date().toISOString(),
       path: req.path,
       method: req.method,
-      status: score < 70 ? 'blocked' : 'passed',
-      abuseIpReport: ipReport // Include the AbuseIPDB report
+      status: score < 70 ? 'blocked' : 'passed'
     };
 
     logRequest(requestLog);
@@ -101,12 +98,6 @@ async function calculateTrustScore(req, clientIp) {
   const requestData = getRequestData(clientIp);
   if (requestData.count > 10) {
     score -= 30;
-  }
-
-  // Check IP address with AbuseIPDB
-  const ipReport = await checkIpAddress(clientIp);
-  if (ipReport && ipReport.data && ipReport.data.reports && ipReport.data.reports.length > 0) {
-    score = 0; // Flag as suspicious
   }
 
   return Math.max(0, score);
