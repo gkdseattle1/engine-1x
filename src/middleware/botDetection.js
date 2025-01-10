@@ -2,6 +2,7 @@ const { getClientIp } = require('../utils/ipUtils');
 const { logRequest } = require('../utils/logger');
 const { getBrowserInfo } = require('../utils/browserUtils');
 const { checkIpAddress } = require('../../scripts/badip');
+const { checkIpAddress: checkIpWithAntiBot } = require('../../scripts/antibot');
 
 const SUSPICIOUS_PATTERNS = [
   /bot/i, /crawler/i, /spider/i, /lighthouse/i,
@@ -34,9 +35,29 @@ setInterval(() => {
 async function botDetectionMiddleware(req, res, next) {
     const clientIp = getClientIp(req);
     const ipReport = await checkIpAddress(clientIp);
+    const antiBotReport = await checkIpWithAntiBot(clientIp, req.headers['user-agent']);
+
+    // Immediately block request if AntiBot API identifies it as a bot
+    if (antiBotReport && antiBotReport.is_bot) {
+      logRequest({
+        ip: clientIp,
+        userAgent: req.headers['user-agent'] || 'Unknown',
+        status: 'blocked',
+        reason: 'Identified as bot by AntiBot API',
+        timestamp: new Date().toISOString(),
+        path: req.path,
+        method: req.method
+      });
+
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Request identified as bot'
+      });
+    }
+
     const score = await calculateTrustScore(req, clientIp);
     const userAgent = req.headers['user-agent'] || 'Unknown';
-    
+
     const requestLog = {
       ip: clientIp,
       userAgent,
@@ -49,19 +70,19 @@ async function botDetectionMiddleware(req, res, next) {
       status: score < 70 ? 'blocked' : 'passed',
       abuseIpReport: ipReport // Include the AbuseIPDB report
     };
-  
+
     logRequest(requestLog);
-  
+
     if (score < 70) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'Request appears to be automated'
       });
     }
-  
+
     req.trustScore = score;
     next();
-  }
+}
 
 async function calculateTrustScore(req, clientIp) {
   let score = 100;
@@ -94,16 +115,16 @@ async function calculateTrustScore(req, clientIp) {
 function getRequestData(clientIp) {
   const now = Date.now();
   const data = requestLogs.get(clientIp) || { count: 0, lastRequest: 0 };
-  
+
   if (now - data.lastRequest > 60000) {
     data.count = 1;
   } else {
     data.count++;
   }
-  
+
   data.lastRequest = now;
   requestLogs.set(clientIp, data);
-  
+
   return data;
 }
 

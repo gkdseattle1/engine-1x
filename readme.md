@@ -25,6 +25,7 @@ A secure token-based redirection system with bot detection and request logging c
    ```plaintext
    PORT=3000
    DEFAULT_REDIRECT_URL=https://example.com
+   ANTIBOT_API_KEY=antibot.pwapikeyhere
    ```
 
 ## Usage
