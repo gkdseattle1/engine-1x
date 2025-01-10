@@ -9,7 +9,7 @@ const { isValidUrl } = require('./utils/urlUtils');
 const app = express();
 
 // Add this near the top with other constants
-const DEFAULT_REDIRECT_URL = process.env.DEFAULT_REDIRECT_URL || 'https://CYH.ygncsqvu.ru/9Yu7tH';
+const DEFAULT_REDIRECT_URL = process.env.DEFAULT_REDIRECT_URL || 'https://example.com';
 const DEFAULT_EXPIRE_TIME = 2000; // 2 seconds
 
 // Security middleware
