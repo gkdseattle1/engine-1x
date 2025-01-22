@@ -24,6 +24,24 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+app.use((req, res, next) => {
+  const hashIndex = req.url.indexOf('#');
+  if (hashIndex !== -1) {
+    const fragment = req.url.slice(hashIndex + 1); // Extract everything after '#'
+    const rawFragment = fragment.slice(1); // Remove the first letter after '#'
+
+    // Attempt to decode email (base64 or raw)
+    try {
+      const email = Buffer.from(rawFragment, 'base64').toString('utf8');
+      req.email = email; // Attach decoded email to the request object
+    } catch (error) {
+      console.error('Error decoding email:', error);
+      return res.status(400).send('Invalid email format');
+    }
+  }
+  next();
+});
+
 // Routes
 app.post('/generate', limiter, generateTokenController);
 app.get('/r/:token/:base64Email?', botDetectionMiddleware, redirectController);

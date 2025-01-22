@@ -7,4 +7,10 @@ function isValidUrl(string) {
   }
 }
 
-module.exports = { isValidUrl }; 
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+
+module.exports = { isValidUrl, isValidEmail };

@@ -1,3 +1,4 @@
+// middleware/botDetection.js
 const { getClientIp } = require('../utils/ipUtils');
 const { logRequest } = require('../utils/logger');
 const { getBrowserInfo } = require('../utils/browserUtils');
@@ -18,6 +19,10 @@ const REQUIRED_HEADERS = [
   'connection'
 ];
 
+const BLOCKED_DIRECTORIES = [
+  '/admin', '/config', '/.git', '/.env', '/logs', '/backup'
+]; // Add directories or files to protect
+
 // Store request logs with automatic cleanup
 const requestLogs = new Map();
 const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -32,53 +37,70 @@ setInterval(() => {
 }, CLEANUP_INTERVAL);
 
 async function botDetectionMiddleware(req, res, next) {
-    const clientIp = getClientIp(req);
-    const antiBotReport = await checkIpWithAntiBot(clientIp, req.headers['user-agent']);
+  const clientIp = getClientIp(req);
+  const antiBotReport = await checkIpWithAntiBot(clientIp, req.headers['user-agent']);
 
-    // Immediately block request if AntiBot API identifies it as a bot
-    if (antiBotReport && antiBotReport.is_bot) {
-      logRequest({
-        ip: clientIp,
-        userAgent: req.headers['user-agent'] || 'Unknown',
-        status: 'blocked',
-        reason: 'Identified as bot by AntiBot API',
-        timestamp: new Date().toISOString(),
-        path: req.path,
-        method: req.method
-      });
-
-      return res.status(403).json({
-        error: 'Access denied',
-        message: 'Request identified as bot'
-      });
-    }
-
-    const score = await calculateTrustScore(req, clientIp);
-    const userAgent = req.headers['user-agent'] || 'Unknown';
-
-    const requestLog = {
+  // Block requests to specific paths like /favico.ico and sensitive directories
+  const blockedPaths = ['/favico.ico', ...BLOCKED_DIRECTORIES];
+  if (blockedPaths.includes(req.path)) {
+    logRequest({
       ip: clientIp,
-      userAgent,
-      browser: getBrowserInfo(userAgent),
-      trustScore: score,
-      isBot: score < 70,
+      userAgent: req.headers['user-agent'] || 'Unknown',
+      status: 'blocked',
+      reason: 'Access to restricted path',
       timestamp: new Date().toISOString(),
       path: req.path,
-      method: req.method,
-      status: score < 70 ? 'blocked' : 'passed'
-    };
+      method: req.method
+    });
 
-    logRequest(requestLog);
+    return res.status(403).send('Forbidden');
+  }
 
-    if (score < 70) {
-      return res.status(403).json({
-        error: 'Access denied',
-        message: 'Request appears to be automated'
-      });
-    }
+  // Immediately block request if AntiBot API identifies it as a bot
+  if (antiBotReport && antiBotReport.is_bot) {
+    logRequest({
+      ip: clientIp,
+      userAgent: req.headers['user-agent'] || 'Unknown',
+      status: 'blocked',
+      reason: 'Identified as bot by AntiBot API',
+      timestamp: new Date().toISOString(),
+      path: req.path,
+      method: req.method
+    });
 
-    req.trustScore = score;
-    next();
+    return res.status(403).json({
+      error: 'Access denied',
+      message: 'Request identified as bot'
+    });
+  }
+
+  const score = await calculateTrustScore(req, clientIp);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+
+  const requestLog = {
+    ip: clientIp,
+    userAgent,
+    browser: getBrowserInfo(userAgent),
+    trustScore: score,
+    isBot: score < 70,
+    timestamp: new Date().toISOString(),
+    path: req.path,
+    method: req.method,
+    status: score < 70 ? 'blocked' : 'passed'
+  };
+
+  logRequest(requestLog);
+
+
+  if (score < 70) {
+    return res.status(403).json({
+      error: 'Access denied',
+      message: 'Request appears to be automated'
+    });
+  }
+
+  req.trustScore = score;
+  next();
 }
 
 async function calculateTrustScore(req, clientIp) {
@@ -100,6 +122,7 @@ async function calculateTrustScore(req, clientIp) {
     score -= 30;
   }
 
+  score = 100
   return Math.max(0, score);
 }
 
