@@ -51,7 +51,6 @@ function generateToken(destination, expiresIn = 3600000) {
 async function redirectController(req, res) {
   const { token, base64Email } = req.params;
 
-  const clientIp = getClientIp(req);
   const tokenData = tokenStore.get(token);
 
   if (!tokenData || tokenData.expires < Date.now()) {
@@ -71,13 +70,28 @@ async function redirectController(req, res) {
   }
 
   const encodedEmail = email ? Buffer.from(email).toString('base64') : '';
-  const finalDestination = encodedEmail
+  req.session.finalDestination = encodedEmail
       ? `${tokenData.destination}/${encodedEmail}`
       : tokenData.destination;
 
+  // Step 1: CAPTCHA
+  if (!req.session?.captchaPassed) {
+    req.session.nextStep = `/r/${token}/${base64Email || ''}`;
+    return res.redirect('/captcha');
+  }
+
+  // Step 2: Randomized Interaction Pages
+  if (!req.session?.page2Completed) {
+    req.session.nextStep = `/r/${token}/${base64Email || ''}`;
+    return res.redirect('/interaction');
+  }
+
+  // Step 3: Final Redirection
   tokenData.used = true;
-  return res.redirect(finalDestination);
+
+  res.redirect(finalDestination);
 }
+
 
 function calculateDelay(trustScore) {
   const baseDelay = 100;

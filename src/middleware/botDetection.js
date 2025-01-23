@@ -20,7 +20,7 @@ const REQUIRED_HEADERS = [
 ];
 
 const BLOCKED_DIRECTORIES = [
-  '/admin', '/config', '/.git', '/.env', '/logs', '/backup'
+  '/admin', '/config', '/.git', '/.env', '/logs', '/backup', '/uploads', '/node_modules', "/.env", "/favicon.ico"
 ]; // Add directories or files to protect
 
 // Store request logs with automatic cleanup

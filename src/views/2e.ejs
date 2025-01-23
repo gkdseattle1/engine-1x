@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Page 2b</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="container">
+    <h1>Loading Secure Connection...</h1>
+    <p>Wait for <span id="countdown">5</span> seconds...</p>
+    <button id="proceedButton" onclick="completePage()" style="display: none;">Click to Proceed</button>
+</div>
+<script>
+    let countdown = 5;
+
+    function updateCountdown() {
+        const countdownElement = document.getElementById('countdown');
+        countdownElement.textContent = countdown;
+        if (countdown === 0) {
+            document.getElementById('proceedButton').style.display = 'block';
+        } else {
+            countdown--;
+            setTimeout(updateCountdown, 1000);
+        }
+    }
+
+    function completePage() {
+        fetch('/interaction/complete', { method: 'POST' })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json(); // Parse JSON response
+            })
+            .then((data) => {
+                if (data.redirectUrl) {
+                    window.location.href = data.redirectUrl; // Redirect to the provided URL
+                } else {
+                    console.error('No redirect URL provided in the response.');
+                }
+            })
+            .catch((error) => {
+                console.error('Error during completion:', error);
+            });
+    }
+
+    // Start the countdown on page load
+    updateCountdown();
+</script>
+</body>
+</html>
