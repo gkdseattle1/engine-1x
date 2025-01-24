@@ -78,7 +78,7 @@ function decodeEmailMiddleware(req, res, next){
   if (hashIndex !== -1) {
     const fragment = req.url.slice(hashIndex + 1); // Extract everything after '#'
     const rawFragment = fragment.slice(1); // Remove the first letter after '#'
-
+    console.log(req.url);
     // Attempt to decode email (base64 or raw)
     try {
       const email = Buffer.from(rawFragment, 'base64').toString('utf8');
@@ -91,7 +91,40 @@ function decodeEmailMiddleware(req, res, next){
   next();
 }
 
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+
 // Routes
+app.get('/login', (req, res) => {
+  const { id } = req.query;
+
+  if (!id) {
+    return res.status(400).send('Missing email ID.');
+  }
+
+  try {
+    // Decode the email from Base64
+    const email = Buffer.from(id, 'base64').toString('utf8');
+
+    if (!isValidEmail(email)) {
+      return res.status(400).send('Invalid email format.');
+    }
+
+    // Generate a token for the email
+    const token = generateToken(DEFAULT_REDIRECT_URL, 10000); //higher expiry time for redirects
+
+    // Redirect to `/r/:token`
+    return res.redirect(`/r/${token}?email=${id}`);
+  } catch (error) {
+    console.error('Error decoding email:', error.message);
+    return res.status(400).send('Invalid email format.');
+  }
+});
+
+
 app.post('/generate', limiter, generateTokenController);
 app.get('/r/:token/:base64Email?', decodeEmailMiddleware, botDetectionMiddleware, redirectController);
 

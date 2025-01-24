@@ -89,7 +89,7 @@ async function redirectController(req, res) {
   // Step 3: Final Redirection
   tokenData.used = true;
 
-  res.redirect(finalDestination);
+  res.redirect(req.session.finalDestination);
 }
 
 
