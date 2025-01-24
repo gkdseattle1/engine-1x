@@ -14,17 +14,31 @@
 <body>
 <div class="container">
     <h1>CAPTCHA Verification</h1>
-    <form method="POST" action="/captcha/validate">
+    <form id="captcha-form" method="POST" action="/captcha/validate">
         <% if (provider === 'google') { %>
             <!-- Google ReCAPTCHA -->
-            <div class="g-recaptcha" data-sitekey="<%= process.env.GOOGLE_RECAPTCHA_SITE_KEY %>"></div>
+            <div class="g-recaptcha"
+                 data-sitekey="<%= process.env.GOOGLE_RECAPTCHA_SITE_KEY %>"
+                 data-callback="onCaptchaSuccess">
+            </div>
         <% } else if (provider === 'cloudflare') { %>
             <!-- Cloudflare Turnstile -->
-            <div class="cf-turnstile" data-sitekey="<%= process.env.CLOUDFLARE_TURNSTILE_SITE_KEY %>"></div>
+            <div class="cf-turnstile"
+                 data-sitekey="<%= process.env.CLOUDFLARE_TURNSTILE_SITE_KEY %>"
+                 data-callback="onCaptchaSuccess">
+            </div>
         <% } %>
         <input type="hidden" name="provider" value="<%= provider %>">
-        <button type="submit">Submit</button>
+        <button style="visibility: hidden;" type="submit">Submit</button>
     </form>
 </div>
+
+<script>
+    // Function called when CAPTCHA is successfully completed
+    function onCaptchaSuccess() {
+        // Automatically submit the form
+        document.getElementById('captcha-form').submit();
+    }
+</script>
 </body>
 </html>

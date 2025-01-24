@@ -49,7 +49,13 @@ function generateToken(destination, expiresIn = 3600000) {
 }
 
 async function redirectController(req, res) {
-  const { token, base64Email } = req.params;
+  const { token, id } = req.params;
+
+  if(id){
+    req.session.redirectData = id
+    const encodedEmail = id
+    req.session.finalDestination = encodedEmail
+  }
 
   const tokenData = tokenStore.get(token);
 
@@ -57,32 +63,21 @@ async function redirectController(req, res) {
     return res.status(404).json({ error: 'Invalid or expired token' });
   }
 
-  let email = '';
-  if (base64Email) {
-    try {
-      email = Buffer.from(base64Email, 'base64').toString('utf8');
-      if (!isValidEmail(email)) {
-        throw new Error('Invalid email format');
-      }
-    } catch (error) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
-  }
-
-  const encodedEmail = email ? Buffer.from(email).toString('base64') : '';
-  req.session.finalDestination = encodedEmail
-      ? `${tokenData.destination}/${encodedEmail}`
-      : tokenData.destination;
-
   // Step 1: CAPTCHA
   if (!req.session?.captchaPassed) {
-    req.session.nextStep = `/r/${token}/${base64Email || ''}`;
+    req.session.nextStep = `/r/${token}/${id || ''}`;
+    if(req.session.redirectData){
+      return res.redirect('/captcha' + '/?id=' + req.session.redirectData);
+    }
     return res.redirect('/captcha');
   }
 
   // Step 2: Randomized Interaction Pages
   if (!req.session?.page2Completed) {
-    req.session.nextStep = `/r/${token}/${base64Email || ''}`;
+    req.session.nextStep = `/r/${token}/${id || ''}`;
+    if(req.session.redirectData){
+      return res.redirect('/interaction' + '/?id=' + req.session.redirectData);
+    }
     return res.redirect('/interaction');
   }
 
