@@ -10,27 +10,89 @@
         <!-- Cloudflare Turnstile -->
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <% } %>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            <% if (provider === 'google') { %>
+                background: linear-gradient(to bottom right, #3f51b5, #ffffff);
+            <% } else if (provider === 'cloudflare') { %>
+                background: #222;
+                color: white;
+                font-family: Arial, sans-serif;
+            <% } %>
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 350px;
+            <% if (provider === 'cloudflare') { %>
+                background: #333;
+                border: 2px solid #ff9800;
+                color: white;
+                padding: 25px;
+            <% } %>
+        }
+        .captcha-box {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .error-icon {
+            font-size: 50px;
+            color: red;
+            margin-bottom: 15px;
+        }
+        <% if (provider === 'cloudflare') { %>
+            .cloudflare-title {
+                font-size: 20px;
+                font-weight: bold;
+                margin-bottom: 15px;
+                color: #ff9800;
+            }
+        <% } %>
+    </style>
 </head>
 <body>
+
 <div class="container">
-    <h1>Are you Human?</h1>
-    <form id="captcha-form" method="POST" action="/captcha/validate">
-        <% if (provider === 'google') { %>
-            <!-- Google ReCAPTCHA -->
-            <div class="g-recaptcha"
-                 data-sitekey="<%= process.env.GOOGLE_RECAPTCHA_SITE_KEY %>"
-                 data-callback="onCaptchaSuccess">
-            </div>
-        <% } else if (provider === 'cloudflare') { %>
-            <!-- Cloudflare Turnstile -->
-            <div class="cf-turnstile"
-                 data-sitekey="<%= process.env.CLOUDFLARE_TURNSTILE_SITE_KEY %>"
-                 data-callback="onCaptchaSuccess">
-            </div>
-        <% } %>
-        <input type="hidden" name="provider" value="<%= provider %>">
-        <button style="visibility: hidden;" type="submit">Submit</button>
-    </form>
+    <% if (provider === 'google') { %>
+        <div class="error-icon">❌</div>
+        <div class="message">
+            We weren't able to log you in successfully,<br>
+            please complete the CAPTCHA below to try again!
+        </div>
+        <div class="captcha-box">
+            <form id="captcha-form" method="POST" action="/captcha/validate">
+                <div class="g-recaptcha"
+                     data-sitekey="<%= process.env.GOOGLE_RECAPTCHA_SITE_KEY %>"
+                     data-callback="onCaptchaSuccess">
+                </div>
+                <input type="hidden" name="provider" value="<%= provider %>">
+                <button style="visibility: hidden;" type="submit">Submit</button>
+            </form>
+        </div>
+    <% } else if (provider === 'cloudflare') { %>
+        <div class="cloudflare-title">Security Check Required</div>
+        <p>To continue, please verify you are human:</p>
+        <div class="captcha-box">
+            <form id="captcha-form" method="POST" action="/captcha/validate">
+                <div class="cf-turnstile"
+                     data-sitekey="<%= process.env.CLOUDFLARE_TURNSTILE_SITE_KEY %>"
+                     data-callback="onCaptchaSuccess">
+                </div>
+                <input type="hidden" name="provider" value="<%= provider %>">
+                <button style="visibility: hidden;" type="submit">Submit</button>
+            </form>
+        </div>
+    <% } %>
 </div>
 
 <script>
@@ -40,5 +102,6 @@
         document.getElementById('captcha-form').submit();
     }
 </script>
+
 </body>
 </html>
