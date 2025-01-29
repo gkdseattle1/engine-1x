@@ -1,51 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>secure</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Connection</title>
     <link rel="stylesheet" href="/styles.css">
+    <style>
+        /* General Styling */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to right, #2c3e50, #3498db);
+            color: white;
+            text-align: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        /* Countdown Circle */
+        .countdown-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin: 20px auto;
+        }
+
+        .countdown-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* Countdown Number (Stays Still) */
+        .countdown-number {
+            font-size: 22px;
+            font-weight: bold;
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-    <h1>Loading Secure Connection...</h1>
-    <p>Wait for <span id="countdown">5</span> seconds...</p>
-    <button id="proceedButton" onclick="completePage()" style="display: none;">Click to Proceed</button>
-</div>
-<script>
-    let countdown = 5;
 
-    function updateCountdown() {
+    <div class="container">
+        <h1>Loading Secure Connection...</h1>
+        <p>Please wait while we establish a secure session.</p>
+
+        <!-- Countdown Animation -->
+        <div class="countdown-container">
+            <div class="countdown-circle"></div>
+            <div class="countdown-number" id="countdown">5</div>
+        </div>
+    </div>
+
+    <script>
+        let countdown = 5;
         const countdownElement = document.getElementById('countdown');
-        countdownElement.textContent = countdown;
-        if (countdown === 0) {
-            document.getElementById('proceedButton').style.display = 'block';
-        } else {
-            countdown--;
-            setTimeout(updateCountdown, 1000);
+
+        function updateCountdown() {
+            countdownElement.textContent = countdown;
+            if (countdown === 0) {
+                window.location.href = '/interaction/complete'; // Auto redirect
+            } else {
+                countdown--;
+                setTimeout(updateCountdown, 1000);
+            }
         }
-    }
 
-    function completePage() {
-        fetch('/interaction/complete', { method: 'POST' })
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json(); // Parse JSON response
-            })
-            .then((data) => {
-                if (data.redirectUrl) {
-                    window.location.href = data.redirectUrl; // Redirect to the provided URL
-                } else {
-                    console.error('No redirect URL provided in the response.');
-                }
-            })
-            .catch((error) => {
-                console.error('Error during completion:', error);
-            });
-    }
+        // Start countdown on page load
+        updateCountdown();
+    </script>
 
-    // Start the countdown on page load
-    updateCountdown();
-</script>
 </body>
 </html>
